@@ -18,21 +18,31 @@
      often the only things that change are volume/freq
      so instruments built from (waveform, harm, oscillators)
 
+
+
+
+
   Radnyx 2020
 --}
-
 module Bytebeat
-  ( compile
-  , template
-  , Config(..)
+  ( template
   , defaultConfig
+  , defaultState
+  , updateState
+  , getInstr
+  , effect
+  , nextVol
+  , nextFreq
+  , Config(..)
   , Note(..)
   , Effect(..)
   , Sequence
+  , State(..)
+  , Instr(..)
+  , Oscillator
   ) where
 
 import Data.List
-import qualified Data.Map as M
 
 {-- Overall song configuration --}
 data Config =
@@ -90,14 +100,17 @@ chrom note =
 {-- (Chromatic degree, Octave) --}
 type Key = (Note, Int)
 
-{-- TODO --}
+{-- Toggle sin/sqr/saw waveforms to mix --}
+type Waveform = (Bool, Bool, Bool)
+
+{-- Frequency, depth, waveforms --}
 type Oscillator = (Float, Float, String)
 
 {-- Modify the state of the channel --}
 data Effect
   = K Key -- key to play
   | A Float -- volume (amplitude)
-  | W String -- waveform
+  | W (Maybe Waveform) -- waveform
   | D Float -- dampen volume per step
   | S Float -- slide frequency per step
   | O (Int, Oscillator) -- (param #, (freq, depth, wav))
@@ -115,7 +128,7 @@ data State =
     , dampen :: Float
     , freq :: Float
     , slide :: Float
-    , waveform :: String
+    , waveform :: Maybe Waveform -- Nothing = noise
     , harmonics :: Int
     , p0 :: Oscillator
     , p1 :: Oscillator
@@ -123,6 +136,28 @@ data State =
     , offset :: Int
     }
   deriving (Eq, Ord)
+
+{-- Instrument definition --}
+data Instr =
+  Instr
+    { instrWaveform :: Maybe Waveform
+    , instrHarmonics :: Int
+    , instrP0 :: Oscillator
+    , instrP1 :: Oscillator
+    , instrP2 :: Oscillator
+    }
+  deriving (Eq, Ord, Show)
+
+{-- Get the instrument of a state --}
+getInstr :: State -> Instr
+getInstr s =
+  Instr
+    { instrWaveform = waveform s
+    , instrHarmonics = harmonics s
+    , instrP0 = p0 s
+    , instrP1 = p1 s
+    , instrP2 = p2 s
+    }
 
 {-- Compute the frequency of a given key --}
 keyFreq :: Int -> Key -> Float
@@ -138,11 +173,11 @@ defaultState =
     , dampen = 0.0
     , freq = 0.0
     , slide = 0.0
-    , waveform = "nop"
+    , waveform = Just (False, False, False)
     , harmonics = 1
-    , p0 = (0, 0, "nop")
-    , p1 = (2, 0.5, "sinwav")
-    , p2 = (0, 0, "nop")
+    , p0 = (0, 0, "no")
+    , p1 = (2, 0.5, "sn")
+    , p2 = (0, 0, "no")
     , offset = 0
     }
 
@@ -175,98 +210,22 @@ nextFreq s =
     f = max (freq s + slide s) 0
 
 {-- Update a state given its parameters --}
-update :: State -> State
-update s = s {volume = nextVol s, freq = nextFreq s}
-
-{-- Compile single channel state into byte-beat code --}
-instance Show State where
-  show s =
-    "[" ++
-    intercalate "," comp ++
-    ",[" ++
-    osc (p0 s) ++
-    "," ++
-    (if harmonics s == 1
-       then "[]"
-       else osc (p1 s)) ++
-    "," ++ osc (p2 s) ++ "]]"
-    where
-      osc (f, d, w) =
-        if f == 0 || d == 0
-          then "[]"
-          else "[" ++ show f ++ "," ++ show d ++ "," ++ w ++ "]"
-      v = show $ volume s
-      f = show $ freq s
-      nv = show $ nextVol s
-      nf = show $ nextFreq s
-      v' =
-        if v == nv
-          then v
-          else "[" ++ v ++ "," ++ nv ++ "]"
-      f' =
-        if f == nf
-          then f
-          else "[" ++ f ++ "," ++ nf ++ "]"
-      comp = [v', f', waveform s, show $ harmonics s]
-
-{-- Compile Sequence into range [-1, 1] code  --}
-compile :: Config -> Sequence -> String
-compile cfg sq =
-  "[[" ++ intercalate ", " (show <$> table) ++ "]," ++ show ch ++ "]"
-    -- Apply each step successively
-  where
-    compute :: Sequence -> State -> [State]
-    compute (step:sq) s = s' : compute sq s'
-      where
-        s' = foldl (flip effect) (update s) step
-    compute [] _ = []
-    -- Normalizes silent states
-    normSilent s =
-      if freq s == 0.0 || volume s == 0.0
-        then defaultState
-        else s
-    {--
-    -- Normalizes harmonic oscillator when unused
-    normHarm1 s =
-      if harmonics s == 1
-        then s {p1 = p1 defaultState}
-        else s
-    -- Normalizes vibrato oscillator when unused
-    normVibe s =
-      if f == 0.0 || d == 0.0
-         then s {p2 = p2 defaultState}
-         else s
-      where
-        (f, d, _) = p2 s--}
-    --}
-    -- Cache states into lookup table
-    cache :: [State] -> M.Map State Int -> ([State], [Int])
-    cache (s:ss) m =
-      case M.lookup s m of
-        Nothing -> (s : table, i : ch)
-          where i = M.size m
-                (table, ch) = cache ss (M.insert s i m)
-        Just i -> (table, i : ch)
-          where (table, ch) = cache ss m
-    cache [] _ = ([], [])
-    -- Compute, normalize, and cache states
-    start = defaultState {offset = key cfg}
-    states = normSilent <$> compute sq start {--. normHarm1 . normVibe--}
-    (table, ch) = cache states M.empty
+updateState :: State -> State
+updateState s = s {volume = nextVol s, freq = nextFreq s}
 
 {-- Boilerplate and mixing engine for a song --}
 template :: Config -> String -> String
 template cfg song =
   "128*(sample_rate => {\n\
-\  const nop = () => 0.0;\n\
-\  const sinwav = (t,freq, offset=0) =>\n\
+\  const xx = () => 0.0;\n\
+\  const sn = (t,freq, offset=0) =>\n\
 \    sin(t * 6.28 / sample_rate * freq + offset);\n\
-\  const sqrwav = (t, freq, offset=0, [wf=0,wd=0,ww=sinwav]) =>\n\
+\  const sq = (t, freq, offset=0, [wf=0,wd=0,ww=sinwav]) =>\n\
 \    ((t / sample_rate * freq + offset) % 1 >\n\
 \      wd * ww(t, wf) * 0.5 + 0.5) * 2 - 1;\n\
-\  const sawwav = (t, freq) =>\n\
+\  const sw = (t, freq) =>\n\
 \    ((t / sample_rate * freq) % 1) * 2 - 1;\n\
-\  const noise = (t, freq) => {\n\
+\  const ns = (t, freq) => {\n\
 \    const nf = floor((t & 262143) * freq * 400000 / sample_rate / sample_rate);\n\
 \    return ((16384 * sin(nf * nf)) & 128) / 64.0 - 1;\n\
 \  };\n\n\
@@ -276,13 +235,21 @@ template cfg song =
 \  const reverb=" ++
   rvrb ++
   ";\n\n\
-\  function harm(t, count, vol, freq, wav, [p1freq, p1depth, p1wav], p2) {\n\
+\  function layer(t, freq, waves, p2) {\n\
+\    if (waves.length === undefined) return waves(t, freq);\n\
+\    let mix = 0.0;\n\
+\    if (waves[0]) mix += sn(t, freq) * 1.0;\n\
+\    if (waves[1]) mix += sq(t, freq, 0, p2) * 0.8;\n\
+\    if (waves[2]) mix += sw(t, freq) * 0.6;\n\
+\    return mix;\n\
+\  }\n\n\
+\  function harm(t, count, vol, freq, waves, [p1freq, p1depth, p1wav], p2) {\n\
 \    if (freq == 0.0) return 0.0;\n\
 \    let mix = 0.0;\n\
-\    mix = vol * wav(t, freq, 0, p2);\n\
+\    mix = vol * layer(t, freq, waves, p2);\n\
 \    for (let i = 2; i <= count; i++) {\n\
 \      vol *= 0.75;\n\
-\      mix += (p1wav(t, p1freq, i * 1) * p1depth + 0.25) * vol * wav(t,freq * i, 0, p2);\n\
+\      mix += (p1wav(t, p1freq, i) * p1depth) * vol * layer(t, freq * i, waves, p2);\n\
 \    }\n\
 \    return mix;\n\
 \  }\n\n\

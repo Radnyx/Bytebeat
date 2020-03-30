@@ -55,17 +55,25 @@ skipComment = do
 ignore :: Parser ()
 ignore = skipMany $ (skipComment <|> (space >> return ()))
 
+{-- Parse a binary digit 1 or 0 --}
+bit :: Parser Char
+bit = char '1' <|> char '0'
+
 {-- Waveform effects --}
-parseWav :: String -> String -> (String -> a) -> Parser a
-parseWav eff fun f = try $ string eff >> (return $ f fun)
+parseWaveName :: Parser String
+parseWaveName = choice $ (try . string) <$> ["sn", "sq", "sw", "ns", "xx"]
 
-sinwav = parseWav "sin" "sinwav"
-
-sqrwav = parseWav "sqr" "sqrwav"
-
-sawwav = parseWav "saw" "sawwav"
-
-noise = parseWav "noise" "noise"
+{-- W100, W 0 0 1, etc. --}
+parseWaveform :: Parser Effect
+parseWaveform = do
+  char 'W'
+  skipwhite
+  i <- bit
+  skipwhite
+  j <- bit
+  skipwhite
+  k <- bit
+  return $ W $ Just (i == '1', j == '1', k == '1')
 
 {-- E-1. C#3, etc. --}
 parseKey :: Parser Effect
@@ -112,7 +120,7 @@ parseVibrato = do
   skipwhite
   d <- floating
   skipwhite
-  s <- sinwav id <|> sqrwav id <|> sawwav id <|> noise id
+  s <- parseWaveName
   return $ O (0, (f, d, s))
 
 {-- P freq depth wav --}
@@ -124,7 +132,7 @@ parsePulse = do
   skipwhite
   d <- floating
   skipwhite
-  s <- sinwav id <|> sqrwav id <|> sawwav id <|> noise id
+  s <- parseWaveName
   return $ O (2, (f, d, s))
 
 {-- Decrease volume per step --}
@@ -134,6 +142,11 @@ parseDampen = do
   skipwhite
   d <- floating
   return $ D d
+
+parseNoise :: Parser Effect
+parseNoise = do
+  try $ string "noise"
+  return $ W Nothing
 
 {-- Parse any other effect than N and X --}
 parseEffect :: Parser Effect
@@ -145,10 +158,8 @@ parseEffect =
   , parseVibrato
   , parseDampen
   , parsePulse
-  , sqrwav W
-  , sinwav W
-  , sawwav W
-  , noise W
+  , parseWaveform
+  , parseNoise
   ]
 
 {-- Parse a single step of a sequence --}

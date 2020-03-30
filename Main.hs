@@ -1,7 +1,9 @@
 {--
   Radnyx 2020
 --}
+
 import Bytebeat
+import Compiler
 import Data.List
 import Parser
 
@@ -31,7 +33,8 @@ concatTracks = aux 1 0
 
 main :: IO ()
 main = do
-  (cfg, sqs) <- readFiles ["test2.bbt"] >>= concatTracks
-  let song = "[" ++ intercalate ",\n" (compile cfg <$> sqs) ++ "]"
-  writeFile "song.js" $ template cfg song
+  (cfg, sqs) <- readFiles ["song1.bbt"] >>= concatTracks
+  let song = compile cfg sqs
+  putStrLn song
+  --writeFile "song.js" $ template cfg song
   putStrLn "Success."
