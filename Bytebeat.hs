@@ -176,7 +176,7 @@ defaultState =
     , waveform = Just (False, False, False)
     , harmonics = 1
     , p0 = (0, 0, "no")
-    , p1 = (2, 0.5, "sn")
+    , p1 = (2, 0.75, "sn")
     , p2 = (0, 0, "no")
     , offset = 0
     }
@@ -240,7 +240,7 @@ template cfg song =
 \    let mix = 0.0;\n\
 \    if (waves[0]) mix += sn(t, freq) * 1.0;\n\
 \    if (waves[1]) mix += sq(t, freq, 0, p2) * 0.8;\n\
-\    if (waves[2]) mix += sw(t, freq) * 0.6;\n\
+\    if (waves[2]) mix += sw(t, freq) * 0.8;\n\
 \    return mix;\n\
 \  }\n\n\
 \  function harm(t, count, vol, freq, waves, [p1freq, p1depth, p1wav], p2) {\n\
