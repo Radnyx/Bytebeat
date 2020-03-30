@@ -35,6 +35,5 @@ main :: IO ()
 main = do
   (cfg, sqs) <- readFiles ["song1.bbt"] >>= concatTracks
   let song = compile cfg sqs
-  putStrLn song
-  --writeFile "song.js" $ template cfg song
+  writeFile "song.js" $ template cfg song
   putStrLn "Success."

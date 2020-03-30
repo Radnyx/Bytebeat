@@ -220,7 +220,7 @@ template cfg song =
 \  const xx = () => 0.0;\n\
 \  const sn = (t,freq, offset=0) =>\n\
 \    sin(t * 6.28 / sample_rate * freq + offset);\n\
-\  const sq = (t, freq, offset=0, [wf=0,wd=0,ww=sinwav]) =>\n\
+\  const sq = (t, freq, offset=0, [wf=0,wd=0,ww=sn]) =>\n\
 \    ((t / sample_rate * freq + offset) % 1 >\n\
 \      wd * ww(t, wf) * 0.5 + 0.5) * 2 - 1;\n\
 \  const sw = (t, freq) =>\n\
@@ -236,7 +236,7 @@ template cfg song =
   rvrb ++
   ";\n\n\
 \  function layer(t, freq, waves, p2) {\n\
-\    if (waves.length === undefined) return waves(t, freq);\n\
+\    if (waves.concat === undefined) return waves(t, freq);\n\
 \    let mix = 0.0;\n\
 \    if (waves[0]) mix += sn(t, freq) * 1.0;\n\
 \    if (waves[1]) mix += sq(t, freq, 0, p2) * 0.8;\n\
@@ -257,24 +257,24 @@ template cfg song =
 \    if (t < 0) return 0.0;\n\
 \    const time = t / sample_rate * " ++
   show 12.93 ++
-  " % song[0][1].length;\n\
+  " % song[1][0][1].length;\n\
 \    const step = floor(time);\n\
 \    const vprog = time - step;\n\
 \    const fprog = floor(vprog * 8) / 8;\n\
 \\n\
 \    let mix = 0.0;\n\
-\    for (let i = 0; i < song.length; i++) {\n\
+\    for (let i = 0; i < song[1].length; i++) {\n\
 \      if (reverb !== undefined && !reverb[i]) continue;\n\
-\      const data = song[i][0][song[i][1][step]];\n\
-\      const [vol, freq, wav, h, p] = data;\n\
-\      const [[p0freq=0, p0depth=0, p0wav=nop], p1, p2] = p;\n\
-\      const v = vol.length === undefined\n\
+\      const vfi = song[1][i][1][step];\n\
+\      const [vol, freq, instr] = song[1][i][0][vfi];\n\
+\      const [waves, h, [p0freq=0, p0depth=0, p0wav=xx], p1, p2] = song[0][instr];\n\
+\      const v = vol.concat === undefined\n\
 \        ? vol\n\
 \        : vol[1] * vprog + vol[0] * (1 - vprog);\n\
-\      const f = freq.length === undefined\n\
+\      const f = freq.concat === undefined\n\
 \        ? freq\n\
 \        : freq[1] * fprog + freq[0] * (1 - fprog);\n\
-\      mix += harm(t, h, v, f + p0wav(t, p0freq) * p0depth, wav, p1, p2);\n\
+\      mix += harm(t, h, v, f + p0wav(t, p0freq) * p0depth, waves, p1, p2);\n\
 \    }\n\
 \    return mix;\n\
 \  }\n\

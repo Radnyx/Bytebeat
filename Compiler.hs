@@ -126,17 +126,17 @@ genVFI vfi = listify [v', f', show $ vfiInstr vfi]
 
 {-- [[...vfi table...], [...indices...]] --}
 genVFIIndex :: ([VFI], [Int]) -> String
-genVFIIndex (vfis, indices) = "\n" ++ listify [listify $ genVFI <$> vfis, show indices]
+genVFIIndex (vfis, indices) =
+  "\n" ++ listify [listify $ genVFI <$> vfis, show indices]
 
-{--  --}
+{-- Convert instrument table and VFI index to javascript array --}
 generate :: [Instr] -> [([VFI], [Int])] -> String
 generate instrs vfis =
-  listify (genInstr <$> instrs) ++ listify (genVFIIndex <$> vfis)
+  listify [listify (genInstr <$> instrs), listify (genVFIIndex <$> vfis)]
 
--- genereate :: [([VFI], [Int])] -> String
-{-- Compile Sequence into range [-1, 1] code  --}
+{-- Compile sequences --}
 compile :: Config -> [Sequence] -> String
-compile cfg sqs = generate itable vfis
+compile cfg sqs = generate (reverse itable) vfis
   where
     apply' = apply (defaultState {offset = key cfg})
     -- Compute, normalize, and cache states
