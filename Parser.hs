@@ -9,6 +9,7 @@ module Parser
 
 import Bytebeat
 import Data.Char
+import Control.Monad
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Number
 
@@ -31,6 +32,7 @@ note 'A' '-' = A_
 note 'A' '#' = As
 note 'B' 'b' = Bb
 note 'B' '-' = B_
+note _ _ = error "Unexpected symbols when parsing note."
 
 {-- Skips spaces and tabs (not newlines!) --}
 skipwhite :: Parser ()
@@ -42,18 +44,18 @@ skipwhite1 = skipMany1 $ oneOf " \t"
 
 {-- Matches newline or EOF --}
 eol :: Parser ()
-eol = (newline >> return ()) <|> eof
+eol = void newline <|> eof
 
 {-- Comments of form # .... \n --}
 skipComment :: Parser ()
 skipComment = do
-  char '#'
+  _ <- char '#'
   skipMany $ noneOf "\n"
   eol
 
 {-- Ignore spaces and comments --}
 ignore :: Parser ()
-ignore = skipMany $ (skipComment <|> (space >> return ()))
+ignore = skipMany (skipComment <|> void space)
 
 {-- Parse a binary digit 1 or 0 --}
 bit :: Parser Char
@@ -61,12 +63,12 @@ bit = char '1' <|> char '0'
 
 {-- Waveform effects --}
 parseWaveName :: Parser String
-parseWaveName = choice $ (try . string) <$> ["sn", "sq", "sw", "ns", "xx"]
+parseWaveName = choice $ try . string <$> ["sn", "sq", "sw", "ns", "xx"]
 
 {-- W100, W 0 0 1, etc. --}
 parseWaveform :: Parser Effect
 parseWaveform = do
-  char 'W'
+  _ <- char 'W'
   skipwhite
   i <- bit
   skipwhite
@@ -90,15 +92,14 @@ parseNote = parseKey <|> (string "---" >> return X) <|> (oneOf "=." >> return N)
 {-- A 0.3, A0.3 --}
 parseVolume :: Parser Effect
 parseVolume = do
-  char 'A'
+  _ <- char 'A'
   skipwhite
-  v <- floating
-  return $ A v
+  A <$> floating
 
 {-- Pitch slide --}
 parseSlide :: Parser Effect
 parseSlide = do
-  char 'S'
+  _ <- char 'S'
   skipwhite
   s <- (char '-' >> floating >>= \f -> return $ -f) <|> floating
   return $ S s
@@ -106,15 +107,14 @@ parseSlide = do
 {-- Number of harmonics --}
 parseHarmonics :: Parser Effect
 parseHarmonics = do
-  char 'H'
+  _ <- char 'H'
   skipwhite
-  h <- nat
-  return $ H h
+  H <$> nat
 
 {-- V freq depth wav --}
 parseVibrato :: Parser Effect
 parseVibrato = do
-  char 'V'
+  _ <- char 'V'
   skipwhite
   f <- floating
   skipwhite
@@ -126,7 +126,7 @@ parseVibrato = do
 {-- P freq depth wav --}
 parsePulse :: Parser Effect
 parsePulse = do
-  char 'P'
+  _ <- char 'P'
   skipwhite
   f <- floating
   skipwhite
@@ -138,42 +138,34 @@ parsePulse = do
 {-- Decrease volume per step --}
 parseDampen :: Parser Effect
 parseDampen = do
-  char 'D'
+  _ <- char 'D'
   skipwhite
-  d <- floating
-  return $ D d
+  D <$> floating
 
 parseNoise :: Parser Effect
 parseNoise = do
-  try $ string "noise"
+  _ <- try $ string "noise"
   return $ W Nothing
 
 {-- Parse any other effect than N and X --}
 parseEffect :: Parser Effect
 parseEffect =
-  choice $
-  [ parseVolume
-  , parseSlide
-  , parseHarmonics
-  , parseVibrato
-  , parseDampen
-  , parsePulse
-  , parseWaveform
-  , parseNoise
-  ]
+  choice
+    [parseVolume, parseSlide, parseHarmonics, parseVibrato,
+    parseDampen, parsePulse, parseWaveform, parseNoise]
 
 {-- Parse a single step of a sequence --}
 parseStep :: Parser [Effect]
 parseStep = do
   e <- parseNote
-  es <- many $ (skipwhite1 >> parseEffect)
+  es <- many $ skipwhite1 >> parseEffect
   eol
   return $ e : es
 
 {-- %master float --}
 parseMaster :: Config -> Parser Config
 parseMaster cfg = do
-  try $ string "%master"
+  _ <- try $ string "%master"
   skipwhite
   v <- floating
   return $ cfg {master = v}
@@ -181,7 +173,7 @@ parseMaster cfg = do
 {-- %samples nat --}
 parseSamples :: Config -> Parser Config
 parseSamples cfg = do
-  try $ string "%samples"
+  _ <- try $ string "%samples"
   skipwhite
   s <- nat
   return $ cfg {samples = s}
@@ -189,7 +181,7 @@ parseSamples cfg = do
 {-- %key int --}
 parseOffset :: Config -> Parser Config
 parseOffset cfg = do
-  try $ string "%key"
+  _ <- try $ string "%key"
   skipwhite
   k <- int
   return $ cfg {key = k}
@@ -197,23 +189,21 @@ parseOffset cfg = do
 {-- %reverb 1 0 ... --}
 parseReverb :: Config -> Parser Config
 parseReverb cfg = do
-  try $ string "%reverb"
-  r <- many1 $ (skipwhite1 >> (char '1' <|> char '0'))
+  _ <- try $ string "%reverb"
+  r <- many1 $ skipwhite1 >> bit
   return $ cfg { reverb = (== '1') <$> r }
 
 parseConfig :: Config -> Parser Config
 parseConfig cfg = do
   ignore
   let options = [parseMaster, parseSamples, parseOffset, parseReverb]
-  ((choice $ (($ cfg) <$> options)) >>=
-   parseConfig) <|>
-    return cfg
+  (choice (($ cfg) <$> options) >>= parseConfig) <|> return cfg
 
 parseSequences :: Parser (Config, [Sequence])
 parseSequences = do
   cfg <- parseConfig defaultConfig
   ignore
-  sqs <- many $ (many1 parseStep >>= \sq -> ignore >> return sq)
+  sqs <- many $ many1 parseStep >>= \sq -> ignore >> return sq
   eol
   return (cfg, sqs)
 

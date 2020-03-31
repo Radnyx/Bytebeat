@@ -9,7 +9,7 @@ import Bytebeat
 import Control.Monad
 import Data.List
 import qualified Data.Map as M
-import Data.Tuple
+import Text.Printf
 
 type InstrIndex = M.Map Instr Int
 
@@ -32,7 +32,7 @@ getVFI instrs s =
     , vfiVol2 = nextVol s
     , vfiFreq1 = freq s
     , vfiFreq2 = nextFreq s
-    , vfiInstr = instrs M.! (getInstr s)
+    , vfiInstr = instrs M.! getInstr s
     }
 
 {-- Apply each step of a sequence successively --}
@@ -70,9 +70,12 @@ vfiIndex instrs m (s:ss) =
     Just i -> (table, i : ch)
       where (table, ch) = vfiIndex instrs m ss
   where
-    instr = getInstr s
     vfi = getVFI instrs s
 vfiIndex _ _ [] = ([], [])
+
+{-- Truncate to 2 decimal places --}
+decimal :: Float -> String
+decimal = printf "%.2f"
 
 {-- "[a,b,c,d,...]" format --}
 listify :: [String] -> String
@@ -83,7 +86,7 @@ genOscillator :: Oscillator -> String
 genOscillator (f, d, w) =
   if f == 0.0 || d == 0.0 || w == "xx"
     then "[]"
-    else listify [show f, show d, w]
+    else listify [decimal f, show d, w]
 
 {-- [[x,y,z] or xx/ns, harmonics, p0, p1, p2] --}
 genInstr :: Instr -> String
@@ -111,10 +114,10 @@ genInstr i =
 genVFI :: VFI -> String
 genVFI vfi = listify [v', f', show $ vfiInstr vfi]
   where
-    v1 = show $ vfiVol1 vfi
-    v2 = show $ vfiVol2 vfi
-    f1 = show $ vfiFreq1 vfi
-    f2 = show $ vfiFreq2 vfi
+    v1 = decimal $ vfiVol1 vfi
+    v2 = decimal $ vfiVol2 vfi
+    f1 = decimal $ vfiFreq1 vfi
+    f2 = decimal $ vfiFreq2 vfi
     v' =
       if v1 == v2
         then v1
@@ -124,22 +127,21 @@ genVFI vfi = listify [v', f', show $ vfiInstr vfi]
         then f1
         else listify [f1, f2]
 
-{-- [[...vfi table...], [...indices...]] --}
-genVFIIndex :: ([VFI], [Int]) -> String
-genVFIIndex (vfis, indices) =
-  "\n" ++ listify [listify $ genVFI <$> vfis, show indices]
-
 {-- Convert instrument table and VFI index to javascript array --}
-generate :: [Instr] -> [([VFI], [Int])] -> String
-generate instrs vfis =
-  listify [listify (genInstr <$> instrs), listify (genVFIIndex <$> vfis)]
+generate :: [Instr] -> [([VFI], [Int])] -> (String, String, String)
+generate instrs index =
+  ( listify $ genInstr <$> instrs
+  , listify $ ("\n"++) . listify . fmap genVFI <$> vfiChannels
+  , listify $ ("\n"++) . show <$> indices)
+  where
+    (vfiChannels, indices) = unzip index
 
 {-- Compile sequences --}
-compile :: Config -> [Sequence] -> String
+compile :: Config -> [Sequence] -> (String, String, String)
 compile cfg sqs = generate (reverse itable) vfis
   where
     apply' = apply (defaultState {offset = key cfg})
     -- Compute, normalize, and cache states
-    states = (\sq -> norm <$> apply' sq) <$> sqs
+    states = fmap norm . apply' <$> sqs
     (imap, itable) = cacheInstr (join states)
-    vfis = (vfiIndex imap M.empty) <$> states
+    vfis = vfiIndex imap M.empty <$> states
