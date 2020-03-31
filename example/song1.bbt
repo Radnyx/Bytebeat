@@ -1,8 +1,8 @@
-
-%master 0.5
 %samples 22050
 %key -1
 %reverb 1 1 1 1 1 0 0
+%mix 1.5 1.0 1.8 1.8 1.8 1.0 1.0
+%master 0.4
 
 # PATTERNS 1-2
 

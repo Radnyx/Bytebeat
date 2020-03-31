@@ -9,17 +9,11 @@
       ? k - 0.25
       : 0.75 - k);
 
-    compressing data is VITAL !
+    vibrato abuse allows for FM textures
+     3/2 freq, 0.1 depth, sine, H2 pretty good bass
+     1 freq, 1 depth, sqr, H3 good bass too
 
-     rename wave functions to one letter
-     X, S, Q, W, N
-
-     another level of indirection to instruments?
-     often the only things that change are volume/freq
-     so instruments built from (waveform, harm, oscillators)
-
-
-
+    %mix configuration
 
 
   Radnyx 2020
@@ -47,10 +41,11 @@ data Config =
     , samples :: Int
     , key :: Int
     , reverb :: [Bool]
+    , mix :: [Float]
     }
 
 defaultConfig :: Config
-defaultConfig = Config {master = 1.0, samples = 44100, key = 0, reverb = []}
+defaultConfig = Config {master = 1.0, samples = 44100, key = 0, reverb = [], mix = []}
 
 {-- Chromatic scale degrees  --}
 data Note

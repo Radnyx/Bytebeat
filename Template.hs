@@ -43,6 +43,9 @@ template cfg (ins, vfi, idx) =
   ",\n\
 \rvb:" ++
   rvb ++
+  ",\n\
+\mix:" ++
+  show (mix cfg) ++
   "\n\
 \},\n\
 \\n\
@@ -84,7 +87,7 @@ template cfg (ins, vfi, idx) =
 \    const f = freq.concat === undefined\n\
 \      ? freq\n\
 \      : freq[1] * fprog + freq[0] * (1 - fprog);\n\
-\    mix += harm(t, h, v, f + p0wav(t, p0freq) * p0depth / t * sample_rate, waves, p1, p2);\n\
+\    mix += window.song.mix[i] * harm(t, h, v, f + p0wav(t, p0freq) * p0depth / t * sample_rate, waves, p1, p2);\n\
 \  }\n\
 \  return mix;\n\
 \},\n\

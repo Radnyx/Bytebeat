@@ -9,9 +9,8 @@ import Bytebeat
 import Control.Monad
 import Data.List
 import qualified Data.Map as M
-import Text.Printf
 import Template
-
+import Text.Printf
 
 {-- Instrument definition --}
 data Instr =
@@ -36,8 +35,8 @@ data VFI =
   deriving (Eq, Ord, Show)
 
 type InstrIndex = M.Map Instr Int
-
   {-- Get the instrument of a state --}
+
 getInstr :: State -> Instr
 getInstr s =
   Instr
@@ -155,17 +154,21 @@ genVFI vfi = listify [v', f', show $ vfiInstr vfi]
 generate :: [Instr] -> [([VFI], [Int])] -> (String, String, String)
 generate instrs index =
   ( listify $ genInstr <$> instrs
-  , listify $ ("\n"++) . listify . fmap genVFI <$> vfiChannels
-  , listify $ ("\n"++) . show <$> indices)
+  , listify $ ("\n" ++) . listify . fmap genVFI <$> vfiChannels
+  , listify $ ("\n" ++) . show <$> indices)
   where
     (vfiChannels, indices) = unzip index
 
 {-- Compile sequences --}
 compile :: Config -> [Sequence] -> String
-compile cfg sqs = template cfg $ generate (reverse itable) vfis
+compile cfg sqs = template cfg' $ generate (reverse itable) vfis
   where
     apply' = apply (defaultState {offset = key cfg})
     -- Compute, normalize, and cache states
     states = fmap norm . apply' <$> sqs
     (imap, itable) = cacheInstr (join states)
     vfis = vfiIndex imap M.empty <$> states
+    cfg' =
+      if null (mix cfg)
+        then cfg {mix = replicate (length sqs) 1}
+        else cfg

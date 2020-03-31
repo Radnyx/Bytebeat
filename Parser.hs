@@ -194,11 +194,17 @@ parseReverb cfg = do
   r <- many1 $ skipwhite1 >> bit
   return $ cfg { reverb = (== '1') <$> r }
 
+parseMix :: Config -> Parser Config
+parseMix cfg = do
+  _ <- try $ string "%mix"
+  m <- many1 $ skipwhite1 >> floating
+  return $ cfg { mix = m }
+
 {-- Parse configuration settings at top of file --}
 parseConfig :: Config -> Parser Config
 parseConfig cfg = do
   ignore
-  let options = [parseMaster, parseSamples, parseOffset, parseReverb]
+  let options = [parseMaster, parseSamples, parseOffset, parseReverb, parseMix]
   (choice (($ cfg) <$> options) >>= parseConfig) <|> return cfg
 
 {-- Parse groups of sequence definitions --}
