@@ -142,6 +142,7 @@ parseDampen = do
   skipwhite
   D <$> floating
 
+{-- noise is an alternative to waveform layering--}
 parseNoise :: Parser Effect
 parseNoise = do
   _ <- try $ string "noise"
@@ -193,12 +194,14 @@ parseReverb cfg = do
   r <- many1 $ skipwhite1 >> bit
   return $ cfg { reverb = (== '1') <$> r }
 
+{-- Parse configuration settings at top of file --}
 parseConfig :: Config -> Parser Config
 parseConfig cfg = do
   ignore
   let options = [parseMaster, parseSamples, parseOffset, parseReverb]
   (choice (($ cfg) <$> options) >>= parseConfig) <|> return cfg
 
+{-- Parse groups of sequence definitions --}
 parseSequences :: Parser (Config, [Sequence])
 parseSequences = do
   cfg <- parseConfig defaultConfig

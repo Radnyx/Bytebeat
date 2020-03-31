@@ -10,8 +10,19 @@ import Control.Monad
 import Data.List
 import qualified Data.Map as M
 import Text.Printf
+import Template
 
-type InstrIndex = M.Map Instr Int
+
+{-- Instrument definition --}
+data Instr =
+  Instr
+    { instrWaveform :: Maybe Waveform
+    , instrHarmonics :: Int
+    , instrP0 :: Oscillator
+    , instrP1 :: Oscillator
+    , instrP2 :: Oscillator
+    }
+  deriving (Eq, Ord, Show)
 
 {-- Verb, Frequency, Instrument element --}
 data VFI =
@@ -23,6 +34,19 @@ data VFI =
     , vfiInstr :: Int -- index into instrument cache
     }
   deriving (Eq, Ord, Show)
+
+type InstrIndex = M.Map Instr Int
+
+  {-- Get the instrument of a state --}
+getInstr :: State -> Instr
+getInstr s =
+  Instr
+    { instrWaveform = waveform s
+    , instrHarmonics = harmonics s
+    , instrP0 = p0 s
+    , instrP1 = p1 s
+    , instrP2 = p2 s
+    }
 
 {-- Get the VFI of a state --}
 getVFI :: InstrIndex -> State -> VFI
@@ -137,8 +161,8 @@ generate instrs index =
     (vfiChannels, indices) = unzip index
 
 {-- Compile sequences --}
-compile :: Config -> [Sequence] -> (String, String, String)
-compile cfg sqs = generate (reverse itable) vfis
+compile :: Config -> [Sequence] -> String
+compile cfg sqs = template cfg $ generate (reverse itable) vfis
   where
     apply' = apply (defaultState {offset = key cfg})
     -- Compute, normalize, and cache states
