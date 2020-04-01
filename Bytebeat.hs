@@ -21,7 +21,7 @@
 module Bytebeat
   ( defaultConfig
   , defaultState
-  , updateState
+  , apply
   , effect
   , nextVol
   , nextFreq
@@ -124,6 +124,7 @@ data State =
     , p0 :: Oscillator
     , p1 :: Oscillator
     , p2 :: Oscillator
+    , p3 :: Oscillator
     , offset :: Int
     }
   deriving (Eq, Ord)
@@ -144,9 +145,10 @@ defaultState =
     , slide = 0.0
     , waveform = Just (False, False, False)
     , harmonics = 1
-    , p0 = (0, 0, "no")
+    , p0 = (0, 0, "xx")
     , p1 = (2, 0.75, "sn")
-    , p2 = (0, 0, "no")
+    , p2 = (0, 0, "xx")
+    , p3 = (0, 0, "xx")
     , offset = 0
     }
 
@@ -162,6 +164,7 @@ effect X s = s {freq = 0.0}
 effect (O (0, o)) s = s {p0 = o} -- vibrato
 effect (O (1, o)) s = s {p1 = o} -- harmonics
 effect (O (2, o)) s = s {p2 = o} -- pulse w./other
+effect (O (3, o)) s = s {p3 = o} -- frequency modulation
 effect (O (i, _)) _ = error $ "Undefined oscillator: " ++ show i
 effect N s = s
 
@@ -182,3 +185,9 @@ nextFreq s =
 updateState :: State -> State
 updateState s = s {volume = nextVol s, freq = nextFreq s}
 
+{-- Apply each step of a sequence successively --}
+apply :: State -> Sequence -> [State]
+apply s (step:sq) = s' : apply s' sq
+  where
+    s' = foldr effect (updateState s) step
+apply _ [] = []

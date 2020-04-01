@@ -20,6 +20,7 @@ data Instr =
     , instrP0 :: Oscillator
     , instrP1 :: Oscillator
     , instrP2 :: Oscillator
+    , instrP3 :: Oscillator
     }
   deriving (Eq, Ord, Show)
 
@@ -35,8 +36,8 @@ data VFI =
   deriving (Eq, Ord, Show)
 
 type InstrIndex = M.Map Instr Int
-  {-- Get the instrument of a state --}
 
+{-- Get the instrument of a state --}
 getInstr :: State -> Instr
 getInstr s =
   Instr
@@ -45,6 +46,7 @@ getInstr s =
     , instrP0 = p0 s
     , instrP1 = p1 s
     , instrP2 = p2 s
+    , instrP3 = p3 s
     }
 
 {-- Get the VFI of a state --}
@@ -57,13 +59,6 @@ getVFI instrs s =
     , vfiFreq2 = nextFreq s
     , vfiInstr = instrs M.! getInstr s
     }
-
-{-- Apply each step of a sequence successively --}
-apply :: State -> Sequence -> [State]
-apply s (step:sq) = s' : apply s' sq
-  where
-    s' = foldr effect (updateState s) step
-apply _ [] = []
 
 {-- Normalizes silent states to default --}
 norm :: State -> State
@@ -131,6 +126,7 @@ genInstr i =
     , genOscillator (instrP0 i)
     , genOscillator (instrP1 i)
     , genOscillator (instrP2 i)
+    , genOscillator (instrP3 i)
     ]
 
 {-- [[vol1, vol2], [freq1, freq2], instr] --}
