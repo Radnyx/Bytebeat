@@ -20,8 +20,8 @@
 --}
 module Bytebeat
   ( defaultConfig
-  , defaultState
   , apply
+  , norm
   , effect
   , nextVol
   , nextFreq
@@ -45,7 +45,8 @@ data Config =
     }
 
 defaultConfig :: Config
-defaultConfig = Config {master = 1.0, samples = 44100, key = 0, reverb = [], mix = []}
+defaultConfig =
+  Config {master = 1.0, samples = 44100, key = 0, reverb = [], mix = []}
 
 {-- Chromatic scale degrees  --}
 data Note
@@ -185,9 +186,19 @@ nextFreq s =
 updateState :: State -> State
 updateState s = s {volume = nextVol s, freq = nextFreq s}
 
-{-- Apply each step of a sequence successively --}
-apply :: State -> Sequence -> [State]
-apply s (step:sq) = s' : apply s' sq
+{-- Normalizes silent states to default --}
+norm :: State -> State
+norm s =
+  if freq s == 0.0 || volume s == 0.0
+    then defaultState
+    else s
+
+{-- Apply each step of a sequence successively (given key offset) --}
+apply :: Int -> Sequence -> [State]
+apply k = aux $ defaultState {offset = k}
   where
-    s' = foldr effect (updateState s) step
-apply _ [] = []
+    aux s (step:sq) = s' : aux s' sq
+      where
+        s' = foldr effect (updateState s) step
+    aux _ [] = []
+

@@ -60,36 +60,34 @@ getVFI instrs s =
     , vfiInstr = instrs M.! getInstr s
     }
 
-{-- Normalizes silent states to default --}
-norm :: State -> State
-norm s =
-  if freq s == 0.0 || volume s == 0.0
-    then defaultState
-    else s
-
 {-- Cache all the instruments in a list of states --}
 cacheInstr :: [State] -> (InstrIndex, [Instr])
-cacheInstr (s:ss) =
-  if M.member instr m
-    then (m, table)
-    else (M.insert instr (M.size m) m, instr : table)
+cacheInstr ss = (instrs, reverse table)
   where
-    instr = getInstr s
-    (m, table) = cacheInstr ss
-cacheInstr [] = (M.empty, [])
+    aux (s:ss') =
+      if M.member instr m
+        then (m, tbl)
+        else (M.insert instr (M.size m) m, instr : tbl)
+      where
+        instr = getInstr s
+        (m, tbl) = aux ss'
+    aux [] = (M.empty, [])
+    (instrs, table) = aux ss
 
 {-- Cache volume, frequency, instrument triplets in list of states --}
-vfiIndex :: InstrIndex -> M.Map VFI Int -> [State] -> ([VFI], [Int])
-vfiIndex instrs m (s:ss) =
-  case M.lookup vfi m of
-    Nothing -> (vfi : table, i : ch)
-      where i = M.size m
-            (table, ch) = vfiIndex instrs (M.insert vfi i m) ss
-    Just i -> (table, i : ch)
-      where (table, ch) = vfiIndex instrs m ss
+vfiIndex :: InstrIndex -> [State] -> ([VFI], [Int])
+vfiIndex instrs = aux M.empty
   where
-    vfi = getVFI instrs s
-vfiIndex _ _ [] = ([], [])
+    aux m (s:ss) =
+      case M.lookup vfi m of
+        Nothing -> (vfi : table, i : ch)
+          where i = M.size m
+                (table, ch) = aux (M.insert vfi i m) ss
+        Just i -> (table, i : ch)
+          where (table, ch) = aux m ss
+      where
+        vfi = getVFI instrs s
+    aux _ [] = ([], [])
 
 {-- Truncate to 2 decimal places --}
 decimal :: Float -> String
@@ -157,13 +155,12 @@ generate instrs index =
 
 {-- Compile sequences --}
 compile :: Config -> [Sequence] -> String
-compile cfg sqs = template cfg' $ generate (reverse itable) vfis
-  where
-    apply' = apply (defaultState {offset = key cfg})
+compile cfg sqs = template cfg' $ generate itable vfis
     -- Compute, normalize, and cache states
-    states = fmap norm . apply' <$> sqs
+  where
+    states = fmap norm . apply (key cfg) <$> sqs
     (imap, itable) = cacheInstr (join states)
-    vfis = vfiIndex imap M.empty <$> states
+    vfis = vfiIndex imap <$> states
     cfg' =
       if null (mix cfg)
         then cfg {mix = replicate (length sqs) 1}
