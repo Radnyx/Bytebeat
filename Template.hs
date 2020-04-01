@@ -80,14 +80,15 @@ template cfg (ins, vfi, idx) =
 \  for (let i = 0; i < window.song.idx.length; i++) {\n\
 \    if (reverb !== undefined && !reverb[i]) continue;\n\
 \    const [vol, freq, instr] = window.song.vfi[i][window.song.idx[i][step]];\n\
-\    const [waves, h, [p0freq=0, p0depth=0, p0wav=xx], p1, p2] = window.song.ins[instr];\n\
+\    const [waves, h, [p0freq=0, p0depth=0, p0wav=xx], p1, p2, [p3freq=0, p3depth=0, p3wav=xx]] = window.song.ins[instr];\n\
 \    const v = vol.concat === undefined\n\
 \      ? vol\n\
 \      : vol[1] * vprog + vol[0] * (1 - vprog);\n\
 \    const f = freq.concat === undefined\n\
 \      ? freq\n\
 \      : freq[1] * fprog + freq[0] * (1 - fprog);\n\
-\    mix += window.song.mix[i] * harm(t, h, v, f + p0wav(t, p0freq) * p0depth / t * sample_rate, waves, p1, p2);\n\
+\    const vib = p0wav(t, p0freq) * p0depth, mod = p3wav(t, f * p3freq) * p3depth;\n\
+\    mix += window.song.mix[i] * harm(t, h, v, f + (vib + mod) / t * sample_rate, waves, p1, p2);\n\
 \  }\n\
 \  return mix;\n\
 \},\n\

@@ -8,8 +8,8 @@ module Parser
   ) where
 
 import Bytebeat
-import Data.Char
 import Control.Monad
+import Data.Char
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Number
 
@@ -135,6 +135,18 @@ parsePulse = do
   s <- parseWaveName
   return $ O (2, (f, d, s))
 
+{-- Z mod depth wav --}
+parseMod :: Parser Effect
+parseMod = do
+  _ <- char 'Z'
+  skipwhite
+  z <- floating
+  skipwhite
+  d <- floating
+  skipwhite
+  s <- parseWaveName
+  return $ O (3, (z, d, s))
+
 {-- Decrease volume per step --}
 parseDampen :: Parser Effect
 parseDampen = do
@@ -152,8 +164,16 @@ parseNoise = do
 parseEffect :: Parser Effect
 parseEffect =
   choice
-    [parseVolume, parseSlide, parseHarmonics, parseVibrato,
-    parseDampen, parsePulse, parseWaveform, parseNoise]
+    [ parseVolume
+    , parseSlide
+    , parseHarmonics
+    , parseVibrato
+    , parseDampen
+    , parsePulse
+    , parseWaveform
+    , parseNoise
+    , parseMod
+    ]
 
 {-- Parse a single step of a sequence --}
 parseStep :: Parser [Effect]
@@ -192,13 +212,13 @@ parseReverb :: Config -> Parser Config
 parseReverb cfg = do
   _ <- try $ string "%reverb"
   r <- many1 $ skipwhite1 >> bit
-  return $ cfg { reverb = (== '1') <$> r }
+  return $ cfg {reverb = (== '1') <$> r}
 
 parseMix :: Config -> Parser Config
 parseMix cfg = do
   _ <- try $ string "%mix"
   m <- many1 $ skipwhite1 >> floating
-  return $ cfg { mix = m }
+  return $ cfg {mix = m}
 
 {-- Parse configuration settings at top of file --}
 parseConfig :: Config -> Parser Config
