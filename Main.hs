@@ -5,6 +5,8 @@
 import Bytebeat
 import Compiler
 import Parser
+import System.Environment
+import System.Exit
 
 {-- Read several tra D0.05ck files together --}
 readFiles :: [String] -> IO [String]
@@ -21,7 +23,8 @@ concatTracks = aux 1 0
       case parseBBT bbt of
         Left e -> do
           putStrLn $ "Parser error in pattern #" ++ show p ++ "."
-          error $ show e
+          print e
+          exitWith (ExitFailure 1)
         Right (cfg, sqs) ->
           putStrLn ("Lengths: " ++ show lengths) >>
             aux (p + 1) (length sqs) bbts >>= \(_, rest) ->
@@ -31,8 +34,16 @@ concatTracks = aux 1 0
                 resize (l, sq) = sq ++ replicate (longest - l) [N]
                 sqs' = resize <$> zip lengths sqs
 
+{-- Ensure correct argument format --}
+checkArgs :: [String] -> IO [String]
+checkArgs args@(_:_:_) = return args
+checkArgs _ = do
+  putStrLn "Expected input of the form: <output>.js <input1>.bbt <input2>.bbt ..."
+  exitWith (ExitFailure 1)
+
 main :: IO ()
 main = do
-  (cfg, sqs) <- readFiles [ "test.bbt"] >>= concatTracks
-  writeFile "song.js" $ compile cfg sqs
+  (output:input) <- getArgs >>= checkArgs
+  (cfg, sqs) <- readFiles input >>= concatTracks
+  writeFile output $ compile cfg sqs
   putStrLn "Success."
