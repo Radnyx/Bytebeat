@@ -7,10 +7,6 @@ import Parser
 import System.Environment
 import System.Exit
 
-{-- Read several tra D0.05ck files together --}
-readFiles :: [String] -> IO [String]
-readFiles xs = sequence (readFile <$> xs)
-
 {-- Parse and concatenate multiple tracks --}
 concatTracks :: [String] -> IO (Config, [Sequence])
 concatTracks bbts = do
@@ -43,6 +39,6 @@ checkArgs _ = do
 main :: IO ()
 main = do
   (output:input) <- getArgs >>= checkArgs
-  (cfg, sqs) <- readFiles input >>= concatTracks
+  (cfg, sqs) <- mapM readFile input >>= concatTracks
   writeFile output $ compile cfg sqs
   putStrLn "Success."
