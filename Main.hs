@@ -1,7 +1,6 @@
 {--
   Radnyx 2020
 --}
-
 import Bytebeat
 import Compiler
 import Parser
@@ -10,35 +9,35 @@ import System.Exit
 
 {-- Read several tra D0.05ck files together --}
 readFiles :: [String] -> IO [String]
-readFiles xs = sequenceA (readFile <$> xs)
+readFiles xs = sequence (readFile <$> xs)
 
 {-- Parse and concatenate multiple tracks --}
 concatTracks :: [String] -> IO (Config, [Sequence])
-concatTracks = aux 1 0
-    -- pattern #, num channels, written tracks
-  where
-    aux :: Int -> Int -> [String] -> IO (Config, [Sequence])
-    aux _ n [] = return (defaultConfig, replicate n [])
-    aux p _ (bbt:bbts) =
-      case parseBBT bbt of
-        Left e -> do
-          putStrLn $ "Parser error in pattern #" ++ show p ++ "."
-          print e
-          exitWith (ExitFailure 1)
-        Right (cfg, sqs) ->
-          putStrLn ("Lengths: " ++ show lengths) >>
-            aux (p + 1) (length sqs) bbts >>= \(_, rest) ->
-              return (cfg, zipWith (++) sqs' rest)
-          where lengths = length <$> sqs
-                longest = maximum lengths
-                resize (l, sq) = sq ++ replicate (longest - l) [N]
-                sqs' = resize <$> zip lengths sqs
+concatTracks bbts = do
+  let check (p, Left e) = do
+        putStrLn $ "Parser error in track #" ++ show p ++ "."
+        print e
+        exitWith (ExitFailure 1)
+      check (_, Right x) = return x
+  let resize sqs = do
+        putStrLn $ "Lengths: " ++ show lengths
+        return $ rsz <$> zip lengths sqs
+        where
+          lengths = length <$> sqs
+          rsz (l, sq) = sq ++ replicate (maximum lengths - l) [N]
+  -- Validate parse for each track
+  (cfg:_, sqs) <-
+    unzip <$> mapM check (zip [1 .. length bbts] (parseBBT <$> bbts))
+  -- Resize sequences to uniform track lengths, concatenate each track together
+  let emptyTrack = replicate (length $ head sqs) []
+  sqs' <- foldr (zipWith (++)) emptyTrack <$> mapM resize sqs
+  return (cfg, sqs')
 
 {-- Ensure correct argument format --}
 checkArgs :: [String] -> IO [String]
 checkArgs args@(_:_:_) = return args
 checkArgs _ = do
-  putStrLn "Expected input of the form: <output>.js <input1>.bbt <input2>.bbt ..."
+  putStrLn "Expected arguments: <output>.js <input1>.bbt <input2>.bbt ..."
   exitWith (ExitFailure 1)
 
 main :: IO ()
