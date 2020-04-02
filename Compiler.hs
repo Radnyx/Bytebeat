@@ -15,14 +15,14 @@ import Text.Printf
 {-- Instrument definition --}
 data Instr =
   Instr
-    { instrWaveform :: Maybe Waveform
+    { instrWaveform :: Waveform
     , instrHarmonics :: Int
     , instrP0 :: Oscillator
     , instrP1 :: Oscillator
     , instrP2 :: Oscillator
     , instrP3 :: Oscillator
     }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
 
 {-- Verb, Frequency, Instrument element --}
 data VFI =
@@ -33,7 +33,7 @@ data VFI =
     , vfiFreq2 :: Float
     , vfiInstr :: Int -- index into instrument cache
     }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
 
 type InstrIndex = M.Map Instr Int
 
@@ -109,16 +109,11 @@ genInstr :: Instr -> String
 genInstr i =
   listify
     [ case instrWaveform i of
-        Nothing -> "ns"
-        Just (x, y, z) ->
+        Noise -> "ns"
+        Waveform (x, y, z) ->
           if not $ or waves
             then "xx"
-            else listify $
-                 (\b ->
-                    if b
-                      then "1"
-                      else "0") <$>
-                 waves
+            else show $ fromEnum <$> waves
           where waves = [x, y, z]
     , show (instrHarmonics i)
     , genOscillator (instrP0 i)

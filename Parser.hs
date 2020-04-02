@@ -13,7 +13,7 @@ import Data.Char
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Number
 
-{-- Convert  --}
+{-- Interpret note string representation --}
 note :: Char -> Char -> Note
 note 'C' '-' = C_
 note 'C' '#' = Cs
@@ -75,7 +75,7 @@ parseWaveform = do
   j <- bit
   skipwhite
   k <- bit
-  return $ W $ Just (i == '1', j == '1', k == '1')
+  return $ W $ Waveform (i == '1', j == '1', k == '1')
 
 {-- E-1. C#3, etc. --}
 parseKey :: Parser Effect
@@ -158,7 +158,7 @@ parseDampen = do
 parseNoise :: Parser Effect
 parseNoise = do
   _ <- try $ string "noise"
-  return $ W Nothing
+  return $ W Noise
 
 {-- Parse any other effect than N and X --}
 parseEffect :: Parser Effect

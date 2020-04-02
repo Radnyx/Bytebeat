@@ -9,15 +9,10 @@
       ? k - 0.25
       : 0.75 - k);
 
-    vibrato abuse allows for FM textures
-     3/2 freq, 0.1 depth, sine, H2 pretty good bass
-     1 freq, 1 depth, sqr, H3 good bass too
-
-    %mix configuration
-
-
   Radnyx 2020
 --}
+{-# LANGUAGE LambdaCase #-}
+
 module Bytebeat
   ( defaultConfig
   , apply
@@ -30,7 +25,7 @@ module Bytebeat
   , Effect(..)
   , Sequence
   , State(..)
-  , Waveform
+  , Waveform(..)
   , Oscillator
   ) where
 
@@ -69,8 +64,8 @@ data Note
   | B_
 
 chrom :: Note -> Int
-chrom note =
-  case note of
+chrom =
+  \case
     C_ -> 0
     Cs -> 1
     Db -> 1
@@ -93,7 +88,10 @@ chrom note =
 type Key = (Note, Int)
 
 {-- Toggle sin/sqr/saw waveforms to mix --}
-type Waveform = (Bool, Bool, Bool)
+data Waveform
+  = Waveform (Bool, Bool, Bool)
+  | Noise
+  deriving (Eq, Ord)
 
 {-- Frequency, depth, waveforms --}
 type Oscillator = (Float, Float, String)
@@ -102,7 +100,7 @@ type Oscillator = (Float, Float, String)
 data Effect
   = K Key -- key to play
   | A Float -- volume (amplitude)
-  | W (Maybe Waveform) -- waveform
+  | W Waveform -- waveform
   | D Float -- dampen volume per step
   | S Float -- slide frequency per step
   | O (Int, Oscillator) -- (param #, (freq, depth, wav))
@@ -120,7 +118,7 @@ data State =
     , dampen :: Float
     , freq :: Float
     , slide :: Float
-    , waveform :: Maybe Waveform -- Nothing = noise
+    , waveform :: Waveform
     , harmonics :: Int
     , p0 :: Oscillator
     , p1 :: Oscillator
@@ -144,7 +142,7 @@ defaultState =
     , dampen = 0.0
     , freq = 0.0
     , slide = 0.0
-    , waveform = Just (False, False, False)
+    , waveform = Waveform (False, False, False)
     , harmonics = 1
     , p0 = (0, 0, "xx")
     , p1 = (2, 0.75, "sn")
@@ -154,20 +152,22 @@ defaultState =
     }
 
 {-- Apply a single effect to a state --}
-effect :: Effect -> State -> State
-effect (K k) s = s {freq = keyFreq (offset s) k}
-effect (A a) s = s {volume = a}
-effect (W w) s = s {waveform = w}
-effect (D d) s = s {dampen = d}
-effect (S f) s = s {slide = f}
-effect (H h) s = s {harmonics = h}
-effect X s = s {freq = 0.0}
-effect (O (0, o)) s = s {p0 = o} -- vibrato
-effect (O (1, o)) s = s {p1 = o} -- harmonics
-effect (O (2, o)) s = s {p2 = o} -- pulse w./other
-effect (O (3, o)) s = s {p3 = o} -- frequency modulation
-effect (O (i, _)) _ = error $ "Undefined oscillator: " ++ show i
-effect N s = s
+effect :: State -> Effect -> State
+effect s =
+  \case
+    (K k) -> s {freq = keyFreq (offset s) k}
+    (A a) -> s {volume = a}
+    (W w) -> s {waveform = w}
+    (D d) -> s {dampen = d}
+    (S f) -> s {slide = f}
+    (H h) -> s {harmonics = h}
+    (O (0, o)) -> s {p0 = o} -- vibrato
+    (O (1, o)) -> s {p1 = o} -- harmonics
+    (O (2, o)) -> s {p2 = o} -- pulse w./other
+    (O (3, o)) -> s {p3 = o} -- frequency modulation
+    (O (i, _)) -> error $ "Undefined oscillator: " ++ show i
+    X -> s {freq = 0.0}
+    N -> s
 
 {-- Compute the next dampened volume --}
 nextVol :: State -> Float
@@ -199,6 +199,5 @@ apply k = aux $ defaultState {offset = k}
   where
     aux s (step:sq) = s' : aux s' sq
       where
-        s' = foldr effect (updateState s) step
+        s' = foldl effect (updateState s) step
     aux _ [] = []
-

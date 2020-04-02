@@ -96,10 +96,4 @@ template cfg (ins, vfi, idx) =
 \128*((generate(t) + 0.25 * generate(t - sample_rate * 0.2, window.song.rvb)) * amplitude) + 127\n\
 \\n"
   where
-    rvb =
-      show $
-      (\x ->
-         if x
-           then 1 :: Int
-           else 0) <$>
-      reverb cfg
+    rvb = show $ fromEnum <$> reverb cfg
