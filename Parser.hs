@@ -152,7 +152,8 @@ parseDampen :: Parser Effect
 parseDampen = do
   _ <- char 'D'
   skipwhite
-  D <$> floating
+  d <- (char '-' >> floating >>= \f -> return $ -f) <|> floating
+  return $ D d
 
 {-- noise is an alternative to waveform layering--}
 parseNoise :: Parser Effect
